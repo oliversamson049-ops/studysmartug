@@ -1,11 +1,6 @@
 import './globals.css'
 import Link from 'next/link'
 
-export const metadata = {
-  title: 'StudySmart UG',
-  description: 'Study resources for Ugandan students',
-}
-
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
@@ -24,4 +19,4 @@ export default function RootLayout({ children }) {
       </body>
     </html>
   )
-    }
+}
