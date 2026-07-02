@@ -1,180 +1,94 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 
-export default function AdminPage() {
-  const [pending, setPending] = useState([]);
-  const [live, setLive] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [password, setPassword] = useState("");
-  const [authed, setAuthed] = useState(false);
+export default function CartPage() {
+  const [cart, setCart] = useState([]);
 
-  const ADMIN_PASSWORD = "studysmart2026";
+  useEffect(() => {
+    setCart(JSON.parse(localStorage.getItem("cart") || "[]"));
+  }, []);
 
-  function login(e) {
-    e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      setAuthed(true);
-      loadBooks();
-    } else {
-      alert("Wrong password.");
-    }
+  function save(next) {
+    setCart(next);
+    localStorage.setItem("cart", JSON.stringify(next));
   }
 
-  async function loadBooks() {
-    setLoading(true);
-    const { data: pendingData } = await supabase
-      .from("books")
-      .select("*")
-      .eq("approved", false)
-      .order("created_at", { ascending: false });
-
-    const { data: liveData } = await supabase
-      .from("books")
-      .select("*")
-      .eq("approved", true)
-      .order("created_at", { ascending: false });
-
-    setPending(pendingData || []);
-    setLive(liveData || []);
-    setLoading(false);
+  function changeQty(id, delta) {
+    const next = cart
+      .map((i) => (i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i))
+      .filter((i) => i.qty > 0);
+    save(next);
   }
 
-  async function approve(id) {
-    await supabase.from("books").update({ approved: true }).eq("id", id);
-    loadBooks();
+  function removeItem(id) {
+    save(cart.filter((i) => i.id !== id));
   }
 
-  async function reject(id) {
-    await supabase.from("books").delete().eq("id", id);
-    loadBooks();
-  }
-
-  async function removeLive(id) {
-    if (!confirm("Remove this book from the marketplace?")) return;
-    await supabase.from("books").delete().eq("id", id);
-    loadBooks();
-  }
-
-  if (!authed) {
-    return (
-      <div className="max-w-sm mx-auto mt-20">
-        <h1 className="font-serif text-2xl font-bold mb-5">Admin login</h1>
-        <form onSubmit={login} className="space-y-3">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter admin password"
-            className="input w-full"
-          />
-          <button
-            type="submit"
-            className="w-full bg-navy text-white font-semibold py-3 rounded-sm hover:bg-[#162c47]"
-          >
-            Login
-          </button>
-        </form>
-      </div>
-    );
-  }
+  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
   return (
-    <div>
-      <h1 className="font-serif text-2xl font-bold mb-1">Admin panel</h1>
-      <p className="text-sm text-ink/60 mb-6">
-        {live.length} books live · {pending.length} awaiting review
-      </p>
-
-      {loading ? (
-        <p className="text-sm text-ink/50">Loading...</p>
+    <div className="max-w-2xl">
+      <h1 className="font-serif text-2xl font-bold mb-5">Your cart</h1>
+      {cart.length === 0 ? (
+        <p className="text-sm text-ink/50 italic">
+          Cart is empty.{" "}
+          <a href="/" className="underline">
+            Go back to the marketplace
+          </a>{" "}
+          to add some books.
+        </p>
       ) : (
         <>
-          {pending.length > 0 && (
-            <section className="mb-8">
-              <h2 className="font-serif text-lg font-bold mb-3 text-red">
-                Pending approval ({pending.length})
-              </h2>
-              <div className="space-y-3">
-                {pending.map((b) => (
-                  <div
-                    key={b.id}
-                    className="bg-[#F5EFE0] border border-ink/10 rounded-sm p-4 flex items-center justify-between gap-4"
+          <div className="space-y-3 mb-6">
+            {cart.map((i) => (
+              <div
+                key={i.id}
+                className="bg-[#F5EFE0] border border-ink/10 rounded-sm p-3 flex items-center gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{i.title}</p>
+                  <p className="text-xs text-ink/50">
+                    UGX {i.price.toLocaleString()} each
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => changeQty(i.id, -1)}
+                    className="w-6 h-6 flex items-center justify-center bg-white border rounded-sm"
                   >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{b.title}</p>
-                      <p className="text-xs text-ink/60">
-                        {b.subject} · {b.format} · UGX {b.price?.toLocaleString()} · by{" "}
-                        {b.seller_name}
-                      </p>
-                      {b.file_url && (
-                        <a
-                          href={b.file_url}
-                          target="_blank"
-                          className="text-xs text-navy underline"
-                        >
-                          Preview file
-                        </a>
-                      )}
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        onClick={() => approve(b.id)}
-                        className="bg-green text-white px-3 py-1.5 text-xs rounded-sm hover:opacity-90"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => reject(b.id)}
-                        className="bg-red text-white px-3 py-1.5 text-xs rounded-sm hover:opacity-90"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {pending.length === 0 && (
-            <p className="text-sm text-ink/50 italic mb-6">
-              No pending submissions right now.
-            </p>
-          )}
-
-          <section>
-            <h2 className="font-serif text-lg font-bold mb-3">
-              Live books ({live.length})
-            </h2>
-            {live.length === 0 ? (
-              <p className="text-sm text-ink/50 italic">No live books yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {live.map((b) => (
-                  <div
-                    key={b.id}
-                    className="bg-[#F5EFE0] border border-ink/10 rounded-sm p-3 flex items-center justify-between gap-3"
+                    −
+                  </button>
+                  <span className="text-sm w-4 text-center">{i.qty}</span>
+                  <button
+                    onClick={() => changeQty(i.id, 1)}
+                    className="w-6 h-6 flex items-center justify-center bg-white border rounded-sm"
                   >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{b.title}</p>
-                      <p className="text-xs text-ink/60">
-                        {b.subject} · {b.format} · UGX {b.price?.toLocaleString()} · by{" "}
-                        {b.seller_name}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => removeLive(b.id)}
-                      className="text-red text-xs underline shrink-0"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+                    +
+                  </button>
+                </div>
+                <button onClick={() => removeItem(i.id)} className="text-red text-sm">
+                  Remove
+                </button>
               </div>
-            )}
-          </section>
+            ))}
+          </div>
+          <div className="flex items-center justify-between border-t border-ink/15 pt-4 mb-5">
+            <span className="font-serif font-bold text-lg">Total</span>
+            <span className="font-bold text-lg text-navy">
+              UGX {total.toLocaleString()}
+            </span>
+          </div>
+          <button
+            onClick={() =>
+              alert(
+                "Mobile Money checkout isn't connected yet — this is where Flutterwave will plug in next."
+              )
+            }
+            className="w-full bg-gold text-ink font-semibold py-3 rounded-sm hover:bg-[#c79430]"
+          >
+            Pay with Mobile Money
+          </button>
         </>
       )}
     </div>
